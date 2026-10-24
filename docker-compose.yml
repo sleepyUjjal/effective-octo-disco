@@ -8,3 +8,9 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
