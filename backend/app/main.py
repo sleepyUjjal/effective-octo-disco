@@ -1,6 +1,6 @@
 import datetime
 from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi.middleware.cors import CORSMiddleware
 
 from .fetcher import fetch_actual_wind, fetch_forecast_wind
 from .dependencies import get_db
@@ -8,8 +8,15 @@ from .security import get_current_user
 from . import crud, metrics, schemas
 
 from .db import engine, Base
-# Ensure tables exist
+Base.metadata.create_all(bind=engine)
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 from .scheduler import schedule_job
 
