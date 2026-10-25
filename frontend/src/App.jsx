@@ -1,33 +1,13 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
-import { Card, CardContent, Typography, Box } from '@mui/material'
-import LatestForecast from './pages/LatestForecast.jsx'
-import HistoricalView from './pages/HistoricalView.jsx'
-import MetricsDashboard from './pages/MetricsDashboard.jsx'
+import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom'
+import { Activity, BarChart3, Database, Menu, X, Clock3 } from 'lucide-react'
+import { useState } from 'react'
+import OverviewDashboard from './pages/OverviewDashboard'
+import ForecastAnalysis from './pages/ForecastAnalysis'
+import DataExplorer from './pages/DataExplorer'
 
-function App() {
-  return (
-    <BrowserRouter>
-      <Box sx={{ p: 2 }}>
-        <Card>
-          <CardContent>
-            <Typography variant="h4" gutterBottom>
-              UK Wind Generation Dashboard
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-              <Link to="/">Latest</Link>
-              <Link to="/historical">Historical</Link>
-              <Link to="/metrics">Metrics</Link>
-            </Box>
-            <Routes>
-              <Route path="/" element={<LatestForecast />} />
-              <Route path="/historical" element={<HistoricalView />} />
-              <Route path="/metrics" element={<MetricsDashboard />} />
-            </Routes>
-          </CardContent>
-        </Card>
-      </Box>
-    </BrowserRouter>
-  )
+const nav = [{ to: '/', label: 'Overview', icon: Activity }, { to: '/analysis', label: 'Forecast analysis', icon: BarChart3 }, { to: '/explorer', label: 'Data explorer', icon: Database }]
+function Shell() {
+  const [open, setOpen] = useState(false); const location = useLocation(); const page = nav.find((item) => item.to === location.pathname)?.label || 'Overview'
+  return <div className="app-shell"><button className="mobile-menu" aria-label="Open navigation" onClick={() => setOpen(true)}><Menu size={20}/></button><aside className={`sidebar ${open ? 'is-open' : ''}`}><div><div className="brand"><span>WATTWISE</span><button aria-label="Close navigation" onClick={() => setOpen(false)}><X size={18}/></button></div><nav>{nav.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end onClick={() => setOpen(false)}><Icon size={17}/><span>{label}</span></NavLink>)}</nav></div><div className="grid-scope"><span>UK NATIONAL GRID</span><span>WIND GENERATION</span></div></aside>{open && <button className="scrim" aria-label="Close navigation" onClick={() => setOpen(false)}/>}<main><header className="topbar"><div><span className="crumb">WATTWISE / </span>{page.toUpperCase()}</div><div className="top-meta"><span><Clock3 size={14}/> LONDON 10:42</span></div></header><Routes><Route path="/" element={<OverviewDashboard/>}/><Route path="/analysis" element={<ForecastAnalysis/>}/><Route path="/explorer" element={<DataExplorer/>}/></Routes></main></div>
 }
-
-export default App
+export default function App() { return <BrowserRouter><Shell/></BrowserRouter> }

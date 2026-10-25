@@ -1,0 +1,78 @@
+// mockData.ts - deterministic mock data for Jan 2026
+export interface Record {
+  start_time: string // ISO datetime
+  generation: number // MW
+}
+export interface Forecast extends Record {
+  publish_time: string // ISO datetime
+}
+
+// Helper to format date strings
+function toISO(date: Date) {
+  return date.toISOString().replace('.000', '')
+}
+
+// Generate 48 half‑hour intervals for a given date
+function generateIntervals(date: string): Record[] {
+  const base = new Date(date + 'T00:00:00Z')
+  const arr: Record[] = []
+  for (let i = 0; i < 48; i++) {
+    const d = new Date(base.getTime() + i * 30 * 60 * 1000)
+    arr.push({ start_time: toISO(d), generation: 1000 + Math.round(Math.random() * 200) })
+  }
+  return arr
+}
+
+// Deterministic data for 15 Jan 2026 (demo)
+const demoDate = '2026-01-15'
+export const actuals: Record[] = generateIntervals(demoDate)
+
+// Forecast revisions – two revisions per interval
+export const forecasts: Forecast[] = actuals.map(a => {
+  const forecastTime = new Date(a.start_time)
+  // first revision published 12h before delivery
+  const pub1 = new Date(forecastTime.getTime() - 12 * 60 * 60 * 1000)
+  // second revision published 1h before delivery
+  const pub2 = new Date(forecastTime.getTime() - 60 * 60 * 1000)
+  // Use a simple bias for the later revision
+  const gen1 = a.generation + Math.round((Math.random() - 0.5) * 30)
+  const gen2 = a.generation + Math.round((Math.random() - 0.5) * 30)
+  return {
+    start_time: a.start_time,
+    generation: Math.random() > 0.5 ? gen1 : gen2,
+    publish_time: Math.random() > 0.5 ? toISO(pub1) : toISO(pub2),
+  }
+})
+
+// Simple metric calculations based on the above data (using the forecast with earliest publish_time)
+export function calculateMetrics(): { mae: number; rmse: number; bias: number; percentiles: Record<string, number> } {
+  const errors = forecasts.map((f, i) => f.generation - actuals[i].generation)
+  const abs = errors.map(e => Math.abs(e))
+  const mae = abs.reduce((a, b) => a + b, 0) / errors.length
+  const rmse = Math.sqrt(errors.reduce((a, b) => a + b * b, 0) / errors.length)
+  const bias = errors.reduce((a, b) => a + b, 0) / errors.length
+  const sorted = abs.slice().sort((a, b) => a - b)
+  const percentiles: Record<string, number> = {
+    '5': sorted[Math.floor(0.05 * sorted.length)],
+    '25': sorted[Math.floor(0.25 * sorted.length)],
+    '50': sorted[Math.floor(0.5 * sorted.length)],
+    '75': sorted[Math.floor(0.75 * sorted.length)],
+    '95': sorted[Math.floor(0.95 * sorted.length)],
+  }
+  return { mae, rmse, bias, percentiles }
+}
+
+export function getActuals(date: string) {
+  // Only demo date supported
+  return Promise.resolve(actuals)
+}
+
+export function getForecasts(date: string) {
+  // Return the forecast with the earliest publish_time (decision‑cutoff view)
+  const sorted = forecasts.slice().sort((a, b) => a.publish_time.localeCompare(b.publish_time))
+  return Promise.resolve(sorted)
+}
+
+export function getMetrics(date: string) {
+  return Promise.resolve(calculateMetrics())
+}

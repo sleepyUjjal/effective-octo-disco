@@ -23,3 +23,8 @@ Dockerfile
 .idea/
 .vscode/
 instructions.md
+.agents/
+.claude/
+.taste-skill/
+agent/
+skills-lock.json
