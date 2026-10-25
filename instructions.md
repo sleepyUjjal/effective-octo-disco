@@ -61,7 +61,7 @@ This document breaks the end‑to‑end implementation into ~20 incremental comm
 
 ## 12. Front‑end API Integration
 - **Commit:** `feat(frontend): hook React Query to backend API`
-- Create `api.ts` with fetch functions for forecasts, actuals, metrics.
+- Create `api.js` with fetch functions for forecasts, actuals, metrics.
 - Build pages: `LatestForecast`, `HistoricalView`, `MetricsDashboard`.
 
 ## 13. UI Design using Taste‑Skill

@@ -4,16 +4,20 @@ from sqlalchemy.orm import Session
 
 from .fetcher import fetch_actual_wind, fetch_forecast_wind
 from .dependencies import get_db
+from .security import get_current_user
 from . import crud, metrics, schemas
 
 from .db import engine, Base
 # Ensure tables exist
-Base.metadata.create_all(bind=engine)
+app = FastAPI()
 
 from .scheduler import schedule_job
 
-app = FastAPI()
+@app.get('/')
+async def hello(user: str = Depends(get_current_user)):
+    return {"message": "Hello, world!"}
 
+@app.on_event('startup')
 async def startup_event():
     schedule_job()
 
@@ -25,7 +29,7 @@ def shutdown_event():
 
 
 @app.get('/wind')
-async def get_wind_data():
+async def get_wind_data(user: str = Depends(get_current_user)):
     """Fetch actual and forecast wind generation for Jan 2026.
     Returns a JSON dict with two keys: ``actual`` and ``forecast``.
     """
@@ -34,7 +38,7 @@ async def get_wind_data():
     return {"actual": actual, "forecast": forecast}
 
 @app.get('/actuals/{date_str}')
-async def get_actuals(date_str: str, db: Session = Depends(get_db)):
+async def get_actuals(date_str: str, db: Session = Depends(get_db), user: str = Depends(get_current_user)):
     """Return actual wind generation for a given date (YYYY-MM-DD)."""
     try:
         target_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
@@ -57,7 +61,7 @@ async def get_actuals(date_str: str, db: Session = Depends(get_db)):
     return actuals
 
 @app.get('/forecasts/{date_str}')
-async def get_forecasts(date_str: str, db: Session = Depends(get_db)):
+async def get_forecasts(date_str: str, db: Session = Depends(get_db), user: str = Depends(get_current_user)):
     """Return wind forecasts for a given date (YYYY-MM-DD)."""
     try:
         target_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
@@ -83,7 +87,7 @@ async def get_forecasts(date_str: str, db: Session = Depends(get_db)):
     return forecasts
 
 @app.get('/metrics/{date_str}')
-async def get_metrics(date_str: str, db: Session = Depends(get_db)):
+async def get_metrics(date_str: str, db: Session = Depends(get_db), user: str = Depends(get_current_user)):
     """Calculate error metrics for a specific date (YYYY-MM-DD).
     Fetches data, stores if missing, returns MAE, RMSE, bias, and percentiles.
     """
