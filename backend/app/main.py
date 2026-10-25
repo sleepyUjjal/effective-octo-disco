@@ -10,10 +10,19 @@ from .db import engine, Base
 # Ensure tables exist
 Base.metadata.create_all(bind=engine)
 
+from .scheduler import schedule_job
+
 app = FastAPI()
-@app.get('/')
-def hello():
-    return {"message": "Hello, world!"}
+
+async def startup_event():
+    schedule_job()
+
+@app.on_event('shutdown')
+def shutdown_event():
+    # Gracefully shut down the scheduler
+    from .scheduler import scheduler
+    scheduler.shutdown()
+
 
 @app.get('/wind')
 async def get_wind_data():
