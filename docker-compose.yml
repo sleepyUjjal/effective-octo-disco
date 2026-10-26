@@ -7,6 +7,8 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - RUN_SCHEDULER=true
+      - DATABASE_URL=sqlite:///./wind_data.db
     restart: unless-stopped
   frontend:
     build:

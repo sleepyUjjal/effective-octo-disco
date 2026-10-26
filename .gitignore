@@ -15,6 +15,11 @@ build/
 *.log
 Dockerfile
 .dockerignore
+!backend/Dockerfile
+!frontend/Dockerfile
+!backend/Dockerfile.vercel
+!frontend/Dockerfile.vercel
+!frontend/nginx.vercel.conf.template
 
 # Vercel
 .vercel
@@ -28,3 +33,5 @@ instructions.md
 .taste-skill/
 agent/
 skills-lock.json
+
+VERCEL.md

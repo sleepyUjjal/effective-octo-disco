@@ -1,4 +1,5 @@
 import datetime
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,6 +11,17 @@ from . import crud, metrics, schemas
 from .db import engine, Base
 Base.metadata.create_all(bind=engine)
 app = FastAPI()
+
+@app.middleware("http")
+async def strip_vercel_api_prefix(request, call_next):
+    """Expose this service at /api/* while retaining local FastAPI routes."""
+    path = request.scope["path"]
+    if path == "/api":
+        request.scope["path"] = "/"
+    elif path.startswith("/api/"):
+        request.scope["path"] = path[4:]
+    return await call_next(request)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['*'],
@@ -26,13 +38,16 @@ async def hello(user: str = Depends(get_current_user)):
 
 @app.on_event('startup')
 async def startup_event():
-    schedule_job()
+    # Vercel containers are request-driven; scheduled work belongs in Vercel Cron.
+    if os.getenv("RUN_SCHEDULER", "false").lower() == "true":
+        schedule_job()
 
 @app.on_event('shutdown')
 def shutdown_event():
     # Gracefully shut down the scheduler
-    from .scheduler import scheduler
-    scheduler.shutdown()
+    if os.getenv("RUN_SCHEDULER", "false").lower() == "true":
+        from .scheduler import scheduler
+        scheduler.shutdown()
 
 
 @app.get('/wind')
