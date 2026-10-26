@@ -1,72 +1,107 @@
-# UK Wind Forecast Dashboard
+# Wattwise
 
-## Project Overview
+Wattwise is a pilot web application for a UK utility's day-ahead procurement team. It helps users inspect national wind-generation forecasts, compare them with actual wind output, and quantify forecast uncertainty before delivery-day decisions.
 
-A Docker‑based web application that visualises UK national wind‑generation forecasts, compares them against actual generation data, and calculates forecast error metrics. It provides a clean, responsive React frontend and a FastAPI backend with HTTP‑Basic authentication. The app can be run locally with Docker Compose or deployed to Vercel using a Docker image.
+The scope is intentionally limited to Elexon national wind data. It does not forecast demand, recommend thermal purchases, show market prices, or execute trades.
 
-A Docker‑based web application that shows the latest UK national wind‑generation forecasts, compares them to actual generation, and quantifies forecast error.
+## Live application
+
+Deployed app: https://effective-octo-disco-eight.vercel.app/
+
+## Data and decision logic
+
+- Actual generation source: Elexon FUELHH, filtered to `fuelType = WIND`.
+- Forecast source: Elexon WINDFOR.
+- The backend connects to the official Elexon data API at `https://data.elexon.co.uk/bmrs/api/v1`.
+- The UI uses a deterministic January 2026 pilot fixture so the assessment views and metrics are repeatable.
+- For a selected cutoff, the applicable forecast is the latest revision published at or before that cutoff. Later revisions are never used for a historical decision.
+- Metrics are calculated from paired observations: MAE, RMSE, forecast bias, and valid interval count.
+
+The live Elexon stream endpoints return the latest published records. They do not provide a durable January 2026 assessment snapshot by themselves, which is why the pilot fixture is retained for the January 2026 screens.
 
 ## Features
-- **Backend** – FastAPI service that fetches Elexon **FUELHH** (actual) and **WINDFOR** (forecast) data, stores it in SQLite, and calculates MAE, RMSE, bias, and error‑band percentages.
-- **Basic HTTP‑Basic authentication** – credentials are supplied via `APP_USERNAME` / `APP_PASSWORD` env vars; constant‑time comparison prevents timing attacks.
-- **Frontend** – React (Vite) UI with MUI components, Recharts line charts, and CSV export.
-- **Design guidance** – UI styled using the `design‑taste‑frontend` skill to ensure a premium, non‑sloppy look.
-- **Docker** – Multi‑stage images for backend and frontend, coordinated with `docker‑compose.yml` for local development.
-- **Vercel deployment** – Docker image can be deployed to Vercel; the Vercel config (`vercel.json`) routes `/api/*` to the backend and serves the React bundle.
-- **CI/CD** – GitHub Actions workflow runs linting, tests, and builds the Docker image on push.
 
-## Local Development
+- Overview dashboard with forecast versus actual chart and operational-watch intervals.
+- Forecast analysis with period filters, signed error, distribution, accuracy bands, and cross-day comparisons.
+- Data explorer with filtering, sorting, pagination, and CSV export using a browser Blob.
+- Custom dropdown controls and responsive layouts.
+- FastAPI data ingestion, error metrics, and HTTP Basic API protection.
 
-```bash
-# Build and start services
+## Architecture
+
+The deployment is one Vercel project with two services and one public domain:
+
+```text
+Browser
+  │
+  ├── /        → frontend service, React + Vite
+  └── /api/*   → backend service, Python + FastAPI
+                     │
+                     └── Elexon FUELHH and WINDFOR streams
+```
+
+`vercel.json` defines the services and rewrites. The frontend uses same-origin `/api/*` calls, so no separate browser-visible API hostname is needed.
+
+For production, configure `DATABASE_URL` with managed PostgreSQL. SQLite is used only by local Docker Compose. The in-process scheduler is enabled locally with `RUN_SCHEDULER=true` and disabled in Vercel, where scheduled refreshes should use Vercel Cron.
+
+## Repository layout
+
+```text
+backend/
+  app/                 FastAPI routes, Elexon fetcher, metrics, security and persistence
+  tests/               Backend tests
+  Dockerfile           Local backend image
+  Dockerfile.vercel    Vercel container image reference
+frontend/
+  src/pages/           Overview, analysis and explorer screens
+  src/components/      Reusable UI controls
+  src/mockData.js      Deterministic January 2026 pilot data
+  Dockerfile           Local frontend image
+docker-compose.yml     Local two-service environment
+vercel.json            Vercel Services routing
+.github/workflows/     CI workflow
+```
+
+## Run locally
+
+### Docker
+
+```sh
 docker compose up --build
 ```
 
-The backend will be reachable at `http://localhost:8000` and the frontend at `http://localhost:3000`.
-```bash
-# Clone the repo
-git clone <repo-url>
-cd effective-octo-disco
+Open `http://localhost:3000`. The backend is available on `http://localhost:8000`.
 
-# Build and start services
-docker compose up --build
-```
-The backend is reachable at `http://localhost:8000` and the frontend at `http://localhost:3000` (if added).
+### Frontend checks
 
-## Authentication Usage
-
-```bash
-curl -u $APP_USERNAME:$APP_PASSWORD https://<project>.vercel.app/api/forecasts/2026-01-15
+```sh
+cd frontend
+npm ci
+npm run lint
+npx eslint src
+npm test -- --runInBand
+npm run build
 ```
 
-Replace `$APP_USERNAME` and `$APP_PASSWORD` with the values you set in Vercel (or your local `.env`).
-Requests to any `/api/*` endpoint require HTTP Basic auth:
-```bash
-curl -u admin:password http://localhost:8000/api/forecasts/2026-01-15
+### Backend checks
+
+```sh
+cd backend
+python -m pip install -r requirements.txt pytest pytest-asyncio respx flake8
+flake8 app tests
+pytest
 ```
-Replace the credentials with the values set in your environment.
 
-## Vercel Deployment
+## Deploy to Vercel
 
-1. Connect the repository to Vercel.
-2. Add the required environment variables in the Vercel dashboard (`APP_USERNAME`, `APP_PASSWORD`, `ELEXON_API_KEY` if needed).
-3. Vercel will detect the root `Dockerfile` and build the Docker image using `vercel.json`.
-4. The app will be served at `https://<project>.vercel.app` with `/api/*` routed to the backend and all other routes serving the React frontend.
-1. Connect the repository to Vercel.
-2. Add the following environment variables in the Vercel dashboard:
-   - `APP_USERNAME`
-   - `APP_PASSWORD`
-   - `ELEXON_API_KEY` (if required by the provider)
-3. Vercel will detect the root `Dockerfile` and build the image.
-4. The app will be served at `https://<project>.vercel.app`.
+1. Import the repository into Vercel.
+2. In Project Settings, select the **Services** framework.
+3. Keep the repository root as the project root.
+4. Add `DATABASE_URL`, `APP_USERNAME`, and `APP_PASSWORD` as production environment variables.
+5. Deploy. Vercel routes `/` to the frontend and `/api/*` to the backend.
 
-## Environment Variables
+Verify the deployed URL in an incognito browser before submitting it.
 
-- `APP_USERNAME` – username for HTTP Basic auth.
-- `APP_PASSWORD` – password for HTTP Basic auth.
-- `ELEXON_API_KEY` – optional API key for fetching data from Elexon services.
+## AI assistance
 
-## AI Assistance
-
-The initial project scaffolding, Dockerfiles, and UI design were generated with the help of **ChatGPT (OpenCode)**. All generated code was reviewed and adapted to fit the project requirements.
-The initial project scaffolding, Dockerfiles, and UI design were generated with the help of **ChatGPT (OpenCode)**. No proprietary code was copied; all generated code is reviewed and adapted.
+AI tools were used for scaffolding, UI iteration, Docker and Vercel configuration, testing support, and documentation drafting. All code was reviewed and adapted for this project.

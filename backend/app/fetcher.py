@@ -1,14 +1,14 @@
 import os
 import asyncio
-import json
 from datetime import datetime, timezone
 from typing import List, Dict
 
 import httpx
 
 # Elexon API endpoints (public streaming endpoints)
-FUELHH_URL = "https://bmrs.elexon.co.uk/api/v1/datasets/FUELHH/stream"
-WINDFOR_URL = "https://bmrs.elexon.co.uk/api/v1/datasets/WINDFOR/stream"
+ELEXON_API_BASE = "https://data.elexon.co.uk/bmrs/api/v1"
+FUELHH_URL = f"{ELEXON_API_BASE}/datasets/FUELHH/stream"
+WINDFOR_URL = f"{ELEXON_API_BASE}/datasets/WINDFOR/stream"
 
 # Helper to parse ISO timestamps and enforce UTC
 def parse_iso(ts: str) -> datetime:
@@ -22,7 +22,7 @@ START_JAN_2026 = datetime(2026, 1, 1, tzinfo=timezone.utc)
 END_JAN_2026 = datetime(2026, 1, 31, 23, 59, 59, tzinfo=timezone.utc)
 
 async def _fetch_lines(url: str) -> List[Dict]:
-    """Fetch a streaming NDJSON endpoint and return a list of parsed JSON objects.
+    """Fetch an Elexon stream and return a list of parsed JSON objects.
 
     Includes simple retry with exponential back‑off (3 attempts).
     """
@@ -32,16 +32,13 @@ async def _fetch_lines(url: str) -> List[Dict]:
     for attempt in range(attempts):
         try:
             async with httpx.AsyncClient(timeout=30) as client:
-                async with client.stream("GET", url) as resp:
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
-                        if not line:
-                            continue
-                        try:
-                            record = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        results.append(record)
+                response = await client.get(url)
+                response.raise_for_status()
+                payload = response.json()
+                if isinstance(payload, list):
+                    results.extend(record for record in payload if isinstance(record, dict))
+                elif isinstance(payload, dict):
+                    results.append(payload)
             break  # success
         except (httpx.HTTPError, httpx.ReadTimeout) as exc:
             if attempt < attempts - 1:
